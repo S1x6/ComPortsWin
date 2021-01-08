@@ -41,7 +41,8 @@ int main(int argc, char *argv[]) {
     COMMTIMEOUTS timeouts;
     GetCommTimeouts(hComm, &timeouts);
     timeouts.ReadIntervalTimeout = specs->timeout; // wait maximum t between getting data
-    timeouts.ReadTotalTimeoutConstant = 0; // no matter how much it will take in total
+    timeouts.ReadTotalTimeoutConstant = 10000; // never wait more than 10 seconds in total on read
+    timeouts.WriteTotalTimeoutConstant = 5000; // never try to write data for more than 5 seconds
     SetCommTimeouts(hComm, &timeouts);
 
     // write to port
