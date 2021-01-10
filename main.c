@@ -72,24 +72,44 @@ unsigned long writeToPort(HANDLE port, unsigned char *payload, int payloadLength
     unsigned long bytesWritten;
     WriteFile(port,        // Handle to the Serial port
               payload,     // Data to be written to the port
-              payloadLength,  //No of bytes to write
-              &bytesWritten, //Bytes written
+              payloadLength,  // No of bytes to write
+              &bytesWritten, // Bytes written
               NULL);
     return bytesWritten;
 }
 
 void readFromPortAndPrint(HANDLE port) {
-    unsigned char *receive = malloc(4096);
+    int totalBufferSize = 64 * 1024; // 64kb
+    const int bufferSize = 64 * 1024; // 64kb
+    unsigned char *receive = malloc(totalBufferSize);
+    unsigned char *buffer = malloc(bufferSize);
     SYSTEMTIME startReadTime, endReadTime;
-    unsigned long bytesRead;
+    unsigned long totalBytesRead = 0;
+    unsigned long bytesRead = 0;
 
-    GetSystemTime(&startReadTime);
-    ReadFile(port, receive, 4096, &bytesRead, NULL);
-    GetSystemTime(&endReadTime);
+    do {
+        if (totalBytesRead >= totalBufferSize) {
+            // reallocation would be called only in case
+            // if we read all the previous space and probably have more to read
+            totalBufferSize += bufferSize;
+            receive = realloc(receive, totalBufferSize);
+            printf("Realloc buffer to %d bytes\n", totalBufferSize);
+        }
+
+        GetSystemTime(&startReadTime);
+        // reading will respect the timeouts set earlier and as soon as
+        // the time between receiving 2 bytes will exceed the timeout
+        // or total timeout will be exceeded, then the reading will be
+        // successfully finished
+        ReadFile(port, buffer, totalBufferSize - totalBytesRead, &bytesRead, NULL);
+        GetSystemTime(&endReadTime);
+        memcpy(receive + totalBytesRead, buffer, bytesRead);
+        totalBytesRead += bytesRead;
+    } while (totalBytesRead >= totalBufferSize);
 
     int readStart = startReadTime.wSecond * 1000 + startReadTime.wMilliseconds;
     int readEnd = endReadTime.wSecond * 1000 + endReadTime.wMilliseconds;
-    printf("%lu bytes read. Started at %d ms, finished at %d ms\n", bytesRead, readStart, readEnd);
+    printf("%lu bytes read. Started at %d ms, finished at %d ms\n", totalBytesRead, readStart, readEnd);
     printBytesAsHex(receive, bytesRead);
 }
 
